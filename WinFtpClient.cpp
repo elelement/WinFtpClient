@@ -1,7 +1,6 @@
 /*
  * WinFtpClient.cpp
  *
- *  Created on: 01/06/2015
  */
 
 #include "WinFtpClient.h"
@@ -18,8 +17,7 @@ using namespace std;
  */
 WinFtpClient::WinFtpClient(const string& strServerIpAddress,
   const string& strLogin, const string& strPassword)
-: BoTransfer    (     )
-, m_strIpAddress(strServerIpAddress)
+: m_strIpAddress(strServerIpAddress)
 , m_strLogin    (strLogin)
 , m_strPassword (strPassword)
 , m_bIsConnected(false)
@@ -217,7 +215,7 @@ bool WinFtpClient::SetDirectory(string const & destination)
    return (CheckExpectedResponse(strBuffer, "250"));
 }
 
-bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTargetPath, ulong_t ulOffset)
+bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTargetPath, unsigned long ulOffset)
 {
    printf("%s() --> Begin\n", __FUNCTION__);
 
