@@ -480,6 +480,7 @@ int WinFtpClient::SendBuffer(SOCKET socket, const string& strBuffer, int iStillT
 
   // As long as we need to send bytes...
   char *pBuffer = new char[strBuffer.size()];
+  char *pCopyPointer = pBuffer;
   memcpy(pBuffer, strBuffer.c_str(), strBuffer.size());
   while(iStillToSend > 0)
   {
@@ -507,7 +508,7 @@ int WinFtpClient::SendBuffer(SOCKET socket, const string& strBuffer, int iStillT
     }
   }
 
-  if(pBuffer) delete[] pBuffer;
+  if(pCopyPointer) delete[] pCopyPointer;
   return 0;
 }
 
