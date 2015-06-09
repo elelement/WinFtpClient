@@ -178,18 +178,7 @@ bool WinFtpClient::FileExists (const std::string&)
    return true;
 }
 
-// TODO
-bool WinFtpClient::MoveFile (const std::string& strSourcePath, const std::string& strTargetPath       )
-{
-   return true;
-}
-
 bool WinFtpClient::GetFile  (const std::string& strSourcePath, const std::string& strTargetPath, bool )
-{
-   return true;
-}
-
-bool WinFtpClient::RetrFile (const std::string& strSource, const std::string& strTarget, bool bRemoveSource)
 {
    return true;
 }
