@@ -39,9 +39,7 @@ public:
 
    virtual void SetParameters  (const std::string& ip, const std::string& login, const std::string& pwd);
    virtual bool FileExists (const std::string&);
-   virtual bool MoveFile (const std::string& strSourcePath, const std::string& strTargetPath       );
    virtual bool GetFile  (const std::string& strSourcePath, const std::string& strTargetPath, bool );
-   virtual bool RetrFile (const std::string& strSource, const std::string& strTarget, bool bRemoveSource);
    virtual std::list<std::string> GetFileList (const std::string& strSourcePath);
 
 protected:
