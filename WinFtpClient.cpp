@@ -396,14 +396,17 @@ bool WinFtpClient::ReceiveAnswer(char* const strBuffer, int iLength)
 
 bool WinFtpClient::CheckExpectedResponse(const string& response, const string& expected)
 {
+   Debug("%s()\n", __FUNCTION__);
    std::istringstream f(response);
    std::string line;
-   std::string before;
    while (std::getline(f, line) && !f.eof())
    {
-      before = line;
+      if(line.find(expected.c_str(), 0) != std::string::npos)
+      {
+         return true;
+      }
    }
-   return (before.find(expected.c_str(), 0) != std::string::npos);
+   return false;
 }
 int WinFtpClient::ParsePortPassive(const string& pasvAnswer)
 {
