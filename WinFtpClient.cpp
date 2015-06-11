@@ -81,6 +81,18 @@ bool WinFtpClient::Connect()
    }
    else
    {
+      int iTimeout = 250000;
+      ulong_t iMode = 0;
+      setsockopt(m_csCommand, SOL_SOCKET, SO_RCVTIMEO, (const char *)&iTimeout, sizeof(iTimeout));
+      int iResult = ioctlsocket(m_csCommand, FIONBIO, &iMode);
+      if (iResult != NO_ERROR)
+      {
+         printf("ioctlsocket failed with error: %ld\n", iResult);
+         closesocket(m_csCommand);
+         m_bIsConnected = false;
+         return false;
+      }
+      
       // Read response
       char strConn[256] = {0};
       ReceiveAnswer(strConn, 256);
