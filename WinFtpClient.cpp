@@ -288,6 +288,19 @@ bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTarget
      printf("%s() Error connecting: %d\n", __FUNCTION__, WSAGetLastError());
      return false;
    }
+   
+   // If the data connection has successfully been created then, the server will answer
+   // with 150 code.
+   Sleep(250);
+   ReceiveAnswer(strBuffer, 256);
+
+   Debug("%s() buffer = %s\n", __FUNCTION__, strBuffer);
+   if (! CheckExpectedResponse(strBuffer, "150"))
+   {
+      Debug("%s() Unexpected server response: %s\n", __FUNCTION__, strBuffer);
+      closesocket(m_csData);
+      return false;
+   }
 
    printf("\nSending...\n");
    // int result = send(m_csData, buffer.c_str(), buffer.size(), 0) != SOCKET_ERROR ;
@@ -337,9 +350,7 @@ bool WinFtpClient::ResumeUpload(const string& targetFile, int offset)
       return false;
    }
 
-   ReceiveAnswer(strBuffer, 256);
-
-   return (CheckExpectedResponse(strBuffer, "150"));
+   return true;
 }
 
 int WinFtpClient::PassiveMode()
