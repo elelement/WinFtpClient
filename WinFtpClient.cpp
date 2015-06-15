@@ -80,22 +80,10 @@ bool WinFtpClient::Connect()
       m_bIsConnected = false;
    }
    else
-   {
-      int iTimeout = 250000;
-      ulong_t iMode = 0;
-      setsockopt(m_csCommand, SOL_SOCKET, SO_RCVTIMEO, (const char *)&iTimeout, sizeof(iTimeout));
-      int iResult = ioctlsocket(m_csCommand, FIONBIO, &iMode);
-      if (iResult != NO_ERROR)
-      {
-         printf("ioctlsocket failed with error: %ld\n", iResult);
-         closesocket(m_csCommand);
-         m_bIsConnected = false;
-         return false;
-      }
-      
+   {      
       // Read response
       char strConn[256] = {0};
-      ReceiveAnswer(strConn, 256);
+      ReceiveAnswer(m_csCommand, strConn, 256);
       strConn[255] = 0;
       if(!CheckExpectedResponse(strConn, "220"))
       {
@@ -148,7 +136,7 @@ bool WinFtpClient::Login()
    SendCommand("USER " + m_strLogin + "\r\n");
    Sleep(250);
    char strUser[256] = {0};
-   ReceiveAnswer(strUser, 256);
+   ReceiveAnswer(m_csCommand, strUser, 256);
    strUser[255] = 0;
    // TODO poner reintentos
    if (!CheckExpectedResponse(strUser, "331")) {
@@ -159,7 +147,7 @@ bool WinFtpClient::Login()
    SendCommand("PASS " + m_strPassword + "\r\n");
    Sleep(250);
    char strPass[256] = {0};
-   ReceiveAnswer(strPass, 256);
+   ReceiveAnswer(m_csCommand, strPass, 256);
    strPass[255] = 0;
 
    int retry = 0;
@@ -212,17 +200,24 @@ bool WinFtpClient::SetDirectory(string const & destination)
    }
 
    char strBuffer[256];
-   ReceiveAnswer(strBuffer, 256);
+   ReceiveAnswer(m_csCommand, strBuffer, 256);
    return (CheckExpectedResponse(strBuffer, "250"));
 }
 
 bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTargetPath, unsigned long ulOffset)
 {
-   printf("%s() --> Begin\n", __FUNCTION__);
+   printf("%s() \n", __FUNCTION__);
+   string strPath = strTargetPath;
+   if(strPath.substr(0, 1) .compare("/") != 0)
+   {
+      strPath = "/" + strPath; // slash symbol
+   }
 
-   string strDir = strTargetPath.substr(0, strTargetPath.find_last_of('/'));
-   string strTargetFilename = strTargetPath.substr(strTargetPath.find_last_of('/') + 1,
-         strTargetPath.size() - 1);
+   printf("%s()\n\tsource file = %s\n\tttarget path = %s\n", __FUNCTION__, strSourceFile.c_str(), strPath.c_str());
+
+   string strDir = strPath.substr(0, strPath.find_last_of('/'));
+   string strTargetFilename = strPath.substr(strPath.find_last_of('/') + 1,
+         strPath.size() - 1);
 
    /*
    *  Get text from strSourceFile starting at ulOffset.
@@ -230,30 +225,25 @@ bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTarget
    string buffer = "";
    ifstream myfile (strSourceFile.c_str(), std::ifstream::in);
 
-   if (myfile && myfile.is_open())
-   {
-      myfile.seekg (0, ios::end); // Move position to ulOffset
-      int fsize = myfile.tellg();
-
-      if(ulOffset < fsize)
-      {
-         myfile.seekg (ulOffset, ios::beg); // Move position to offset
-         buffer.resize(fsize - ulOffset); // Allocate memory
-         myfile.read(&buffer[0], buffer.size()); // Read the contents from offset to end
-         myfile.close();
-      }
-      else
-      {
-         printf("%s() Offset value is greater than the file size itself (%lu > %lu)\n", __FUNCTION__, ulOffset, fsize);
-         return false;
-      }
-
-   }
-   else
+   if (!myfile || !myfile.is_open())
    {
       printf("%s(): Error opening source file = %\n", __FUNCTION__, strSourceFile.c_str());
       return false;
    }
+
+   myfile.seekg (0, ios::end); // Move position to ulOffset
+   ulong_t fsize = myfile.tellg();
+
+   if(ulOffset >= fsize)
+   {
+      printf("%s() Offset value is greater than the file size itself (%lu > %lu)\n", __FUNCTION__, ulOffset, fsize);
+      return false;
+   }
+
+   myfile.seekg (ulOffset, ios::beg); // Move position to offset
+   buffer.resize(fsize - ulOffset); // Allocate memory
+   myfile.read(&buffer[0], buffer.size()); // Read the contents from offset to end
+   myfile.close();
 
    /* Set destination directory */
    if(!SetDirectory(strDir))
@@ -265,10 +255,9 @@ bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTarget
    /* Start passive mode */
    char strBuffer[256];
    int port = PassiveMode();
-   if(port == 0)
+   if(port <= 0)
    {
       printf("%s() Couldn't determine connection port number for data interchange\n", __FUNCTION__);
-      printf("%s\n", strBuffer);
       return false;
    }
 
@@ -277,9 +266,9 @@ bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTarget
    /* Resume upload if proceed */
    if(!ResumeUpload(strTargetFilename, ulOffset))
    {
-      printf("Error while sending REST + STOR sequence: %d\n", WSAGetLastError());
+      printf("%s() Error while sending REST + STOR sequence: %d\n", __FUNCTION__, WSAGetLastError());
+      return false;
    }
-
    printf("%s() Resuming uploading at %d\n", __FUNCTION__, ulOffset);
 
    m_csData = GetSocket(m_strIpAddress, port);
@@ -288,36 +277,44 @@ bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTarget
      printf("%s() Error connecting: %d\n", __FUNCTION__, WSAGetLastError());
      return false;
    }
-   
+
    // If the data connection has successfully been created then, the server will answer
    // with 150 code.
-   Sleep(250);
-   ReceiveAnswer(strBuffer, 256);
 
-   Debug("%s() buffer = %s\n", __FUNCTION__, strBuffer);
+   Sleep(250);
+   ReceiveAnswer(m_csCommand, strBuffer, 256);
+
+   printf("%s() buffer = %s\n", __FUNCTION__, strBuffer);
    if (! CheckExpectedResponse(strBuffer, "150"))
    {
-      Debug("%s() Unexpected server response: %s\n", __FUNCTION__, strBuffer);
-      closesocket(m_csData);
+      printf("%s() Unexpected server response: %s\n", __FUNCTION__, strBuffer);
       return false;
    }
 
-   printf("\nSending...\n");
-   // int result = send(m_csData, buffer.c_str(), buffer.size(), 0) != SOCKET_ERROR ;
-   bool bResult = SendBuffer(m_csData, buffer, buffer.size()) == 0;
+   printf("%s() Sending: %s\n", __FUNCTION__, buffer.c_str());
+   int result = SendBuffer(m_csData, buffer, buffer.size());
+
+   // Close data socket
    closesocket(m_csData);
-   printf("%s() closed socket: %d\n", __FUNCTION__, WSAGetLastError());
+   printf("%s() Closed socket: %d\n", __FUNCTION__, WSAGetLastError());
 
-
-   // Check that the server updated correctly the target file
-   ReceiveAnswer(strBuffer, 256);
-
-   if(! (bResult &= CheckExpectedResponse(strBuffer, "226")) )
+   // And check it's what we expected
+   if(result != 0)
    {
-      printf("Unexpected server response: %s\n", strBuffer);
+      printf("%s() Sending data failed: %d\n", __FUNCTION__, result);
+      return false;
    }
 
-   return bResult;
+   // Check that the server updated correctly the target file
+   result = ReceiveAnswer(m_csCommand, strBuffer, 256);
+
+   if(! CheckExpectedResponse(strBuffer, "226"))
+   {
+      printf("%s() Unexpected server response: %s\n", __FUNCTION__, strBuffer);
+      return false;
+   }
+
+   return true;
 }
 
 
@@ -390,47 +387,6 @@ int WinFtpClient::PassiveMode()
    return ParsePortPassive(strBuffer);
 }
 
-bool WinFtpClient::SendCommand(const string& strCommand)
-{
-   int iResult;
-   // Send an initial buffer
-   iResult = send(m_csCommand, strCommand.c_str(), (int) strCommand.size(), 0);
-   return iResult != SOCKET_ERROR;
-}
-
-bool WinFtpClient::ReceiveAnswer(char* const strBuffer, int iLength)
-{
-   // Clean the array before use
-   memset(&strBuffer[0], 0, iLength);
-
-   int iResult = -1;
-   // Send an initial buffer
-   iResult = recv(m_csCommand, strBuffer, iLength, 0);
-
-   if (iResult == SOCKET_ERROR) {
-      printf("Answer failed: %d\n", WSAGetLastError());
-      return false;
-   }
-
-   printf("Bytes received: %d\n", iResult);
-
-   return true;
-}
-
-bool WinFtpClient::CheckExpectedResponse(const string& response, const string& expected)
-{
-   Debug("%s()\n", __FUNCTION__);
-   std::istringstream f(response);
-   std::string line;
-   while (std::getline(f, line) && !f.eof())
-   {
-      if(line.find(expected.c_str(), 0) != std::string::npos)
-      {
-         return true;
-      }
-   }
-   return false;
-}
 int WinFtpClient::ParsePortPassive(const string& pasvAnswer)
 {
    std::istringstream f(pasvAnswer);
@@ -457,6 +413,75 @@ int WinFtpClient::ParsePortPassive(const string& pasvAnswer)
    int port = p1 * 256 + p2;
 
    return port;
+}
+
+bool WinFtpClient::CheckExpectedResponse(const string& response, const string& expected)
+{
+   printf("%s()\n", __FUNCTION__);
+   std::istringstream f(response);
+   std::string line;
+   while (std::getline(f, line) && !f.eof())
+   {
+      if(line.find(expected.c_str(), 0) != std::string::npos)
+      {
+         return true;
+      }
+   }
+   return false;
+}
+
+bool WinFtpClient::SendCommand(const string& strCommand)
+{
+   Debug("%s() Command: %s\n", __FUNCTION__, strCommand.c_str());
+   int iResult;
+   // Send an initial buffer
+   iResult = SendBuffer(m_csCommand, strCommand, strCommand.size());
+   return iResult != SOCKET_ERROR;
+}
+
+int WinFtpClient::ReceiveAnswer(SOCKET socket, char* const strBuffer, int iLength)
+{
+   int iRC = 0;
+   int iSendStatus = 0;
+   timeval RecvTimeout;
+
+   fd_set fds;
+
+   FD_ZERO(&fds);
+   FD_SET(socket, &fds);
+
+   // Set timeout
+   RecvTimeout.tv_sec  = 0;
+   RecvTimeout.tv_usec = 500000;              // 500 ms
+
+   iRC = select(0, &fds, NULL, NULL, &RecvTimeout);
+
+   // Timeout
+   if(!iRC)
+   {
+      printf("%s() Timeout reading\n", __FUNCTION__);
+      return 0;
+   }
+
+   // Error
+   if(iRC < 0)
+   {
+      printf("%s() Error reading: %ld\n", __FUNCTION__, WSAGetLastError());
+      return -1;
+   }
+
+   int iResult = -1;
+
+   // Clean the array before use
+   memset(&strBuffer[0], 0, iLength);
+
+   if (recv(socket, strBuffer, iLength, 0) == SOCKET_ERROR)
+   {
+      printf("Answer failed: %d\n", WSAGetLastError());
+      return -2;
+   }
+
+   return iLength;
 }
 
 SOCKET WinFtpClient::GetSocket(const string& strIpAddress, ushort_t usPort)
@@ -537,7 +562,4 @@ int WinFtpClient::SendBuffer(SOCKET socket, const string& strBuffer, int iStillT
   if(pCopyPointer) delete[] pCopyPointer;
   return 0;
 }
-
-
-
 
