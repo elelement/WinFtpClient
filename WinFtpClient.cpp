@@ -227,7 +227,7 @@ bool WinFtpClient::SendFile(const string& strSourceFile, const string& strTarget
 
    if (!myfile || !myfile.is_open())
    {
-      printf("%s(): Error opening source file = %\n", __FUNCTION__, strSourceFile.c_str());
+      printf("%s(): Error opening source file = %s\n", __FUNCTION__, strSourceFile.c_str());
       return false;
    }
 
