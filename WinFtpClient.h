@@ -44,7 +44,7 @@ public:
 
 protected:
    bool SendCommand(const std::string& strCommand);
-   bool ReceiveAnswer(char* const strBuffer, int iLength);
+   int ReceiveAnswer(SOCKET socket, char* const strBuffer, int iLength);
    bool CheckExpectedResponse(const std::string& response, const std::string& expected);
    int PassiveMode();
    bool ResumeUpload(const std::string& targetFile, int offset);
