@@ -44,13 +44,13 @@ public:
 
 protected:
    bool SendCommand(const std::string& strCommand);
-   int ReceiveAnswer(SOCKET socket, char* const strBuffer, int iLength);
    bool CheckExpectedResponse(const std::string& response, const std::string& expected);
    int PassiveMode();
    bool ResumeUpload(const std::string& targetFile, int offset);
-
-   // Private functions
+   int ParsePortPassive(const std::string& pasvAnswer);
    SOCKET GetSocket(const std::string& strIpAddress, ushort_t usPort);
+   int ReceiveAnswer(SOCKET socket, char* const strBuffer, int iLength);
+   int SendBuffer(SOCKET socket, const std::string& strBuffer, int iStillToSend);
 
 private:
    std::string m_strIpAddress;
@@ -61,10 +61,8 @@ private:
    SOCKET m_csCommand, m_csData;
 
    // Private functions
-   int ParsePortPassive(const std::string& pasvAnswer);
    template <typename T>
    std::string BuildCommand(const std::string& strCommand, const T& strParams);
-   int SendBuffer(SOCKET socket, const std::string& strBuffer, int iStillToSend);
 
 };
 
