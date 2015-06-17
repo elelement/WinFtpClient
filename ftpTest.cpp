@@ -11,7 +11,7 @@ int main()
 {
    printf("Comienza el programa\n");
 
-   BoMyFtpTransfer transfer("127.0.0.1", "ftpuser", "ftpuser");
+   WinFtpClient transfer("127.0.0.1", "ftpuser", "ftpuser");
    if(transfer.Connect())
    {
       if(transfer.SendFile("c:/ftp_local/local/origen.txt", "./local/destino.txt", 32))
